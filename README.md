@@ -41,6 +41,17 @@
 （几何上无整数齿数解，或配对跨级无法不重复）与“**可装配但速比不达标**”
 （附误差最小的一种装配供参考）。
 
+再支持**转速异常定位**：录入已装好的 **1～3 级**传动各级**主动 / 从动齿数**，
+以及**多次观测**中各轴在**同一时段**的转数与每个读数的**绝对误差**
+（真实转数 ∈ [读数−误差, 读数+误差]）；每次观测至少包含**输入轴与输出轴**，
+允许缺少中间轴，同一观测内同一轴不得重复记录。系统按齿数精确计算理论速比，
+把读数误差区间换算为任意两观测轴之间轴段的**实测速比区间**；在“**至多一级**存在
+跨观测恒定倍率偏差（实测 = m × 理论）”的假设下，逐级求 m 的可行倍率区间
+（含该级的轴段给出 m 约束并跨观测取交集，**不含该级的轴段用于交叉核对**）。
+结论明确区分：**传动正常**、**可疑级位及其倍率范围**、**多个级位无法区分**、
+**与单级恒定偏差假设不符**；只要区间仍含正常倍率 1 就保留不确定性，
+**不凭单次首末轴读数指认具体级位**。
+
 ## 一键启动（Docker Compose，自动安装依赖并构建）
 
 ```bash
@@ -57,6 +68,7 @@ docker compose up --build
 | 双档换速（固定一级 + 换装一级） | **http://localhost:3000/dual-speed**（或 `/dual-speed.html`） |
 | 带载安全选配（扭矩校核） | **http://localhost:3000/torque**（或 `/torque.html`） |
 | 轴位装配（定轴距 / 模数逐轴安装） | **http://localhost:3000/layout**（或 `/layout.html`） |
+| 转速异常定位（转数观测 / 倍率定位） | **http://localhost:3000/diagnose**（或 `/diagnose.html`） |
 
 后台运行可用 `docker compose up --build -d`，停止用 `docker compose down`。
 
@@ -71,7 +83,8 @@ npm start
 
 访问 http://localhost:3000 ，批量装配页 http://localhost:3000/batch ，
 缺齿补货页 http://localhost:3000/procure ，双档换速页 http://localhost:3000/dual-speed ，
-带载安全选配页 http://localhost:3000/torque ，轴位装配页 http://localhost:3000/layout 。
+带载安全选配页 http://localhost:3000/torque ，轴位装配页 http://localhost:3000/layout ，
+转速异常定位页 http://localhost:3000/diagnose 。
 
 ## 必要配置（环境变量）
 
@@ -80,10 +93,11 @@ npm start
 | `PORT` | 容器内服务监听端口（一般无需修改） | `3000` |
 | `APP_PORT` | Compose 映射到宿主机的端口，按需覆盖，例如 `APP_PORT=8080 docker compose up --build` | `3000` |
 
-两个变量控制同一服务端口，六个页面共用；例如改用宿主机 8080 端口后，访问
+两个变量控制同一服务端口，七个页面共用；例如改用宿主机 8080 端口后，访问
 http://localhost:8080 （单台）、http://localhost:8080/batch （批量）、
 http://localhost:8080/procure （缺齿补货）、http://localhost:8080/dual-speed （双档换速）、
-http://localhost:8080/torque （带载安全）与 http://localhost:8080/layout （轴位装配）：
+http://localhost:8080/torque （带载安全）、http://localhost:8080/layout （轴位装配）
+与 http://localhost:8080/diagnose （转速异常定位）：
 
 ```bash
 APP_PORT=8080 docker compose up --build
@@ -244,6 +258,51 @@ APP_PORT=8080 docker compose up --build
 1. **相对误差最小**（精确分数比较）；
 2. 并列时按各级 (主动轮编号, 从动轮编号) 序列做**编号自然序**决胜
    （逐对逐级比较；`G2` 排在 `G10` 之前）。
+
+## 使用说明 — 转速异常定位
+
+1. 在顶部导航进入 **转速异常定位**（`/diagnose`）。
+2. 按 **输入轴 → 输出轴** 的顺序录入已装好的 **1～3 级**齿轮：每级填写
+   **主动齿数 / 从动齿数**（正整数），系统据此逐级精确计算理论本级速比
+   （主动/从动）与各轴相对输入轴的理论转速比。
+3. 添加 **1～20 次观测**，每次观测填写：
+   - 观测名称（可空，默认“观测 N”）；
+   - 该次观测在**同一时段**记录的各轴读数：**轴号、转数、该读数的绝对误差**
+     （可带小数，如 `366.67`；无误差填 `0`）。每次**至少记录输入轴（轴 1）
+     与输出轴（轴 n+1）**，**中间轴允许缺少**；同一观测内**同一轴只能记录一次**。
+     绝对误差必须**小于转数本身**（否则真实转数区间 [N−e, N+e] 覆盖零值，
+     无法计算正的速比区间，提交时返回 400）。
+4. 点击“开始异常定位”，系统：
+   - 由齿数用精确分数算出每段轴的理论速比；
+   - 对每次观测内**全部已记录轴对**（不限于相邻轴），把读数误差区间换算为
+     实测速比区间 `[L, H]`：L = (N_b−e_b)/(N_a+e_a)、H = (N_b+e_b)/(N_a−e_a)；
+   - 标记每个轴段是否与理论速比相符（理论值是否落在 [L,H] 内）；
+   - 在“**至多一级**存在**跨观测恒定**倍率偏差 m”的假设下逐级计算：
+     含该级的轴段要求 m ∈ [L/T, H/T]，跨全部观测取**交集**；
+     **不含该级的轴段必须全部与理论相符（交叉核对）**。
+5. 结果区先给出总体结论（四类之一），再列出**逐级倍率可行区间表**与
+   **逐次观测的读数 / 轴段明细**：
+   - **传动正常**（`normal`）：全部轴段区间覆盖理论值——即使某级确有偏差，
+     其取值仍与正常倍率 m = 1 不可区分，按正常处理并保留该不确定性；
+   - **可疑级位**（`suspect`）：恰好一级可行，给出该级与跨观测恒定倍率范围，
+     并说明倍率整体在 1 的上方（实测偏快）还是下方（偏慢）；
+   - **多个级位无法区分**（`ambiguous`）：多级均可单独解释全部观测；
+     当各次观测都只有首末轴读数时，各级倍率区间必然完全相同，
+     页面会明确提示**不能仅凭首末轴读数指认级位**，并建议补测中间轴；
+   - **与单级恒定偏差假设不符**（`inconsistent`）：没有任何一级的恒定倍率区间
+     能同时兼容全部观测（区间无交集或交叉核对失败），可能是多级异常、
+     倍率随工况变化或误差被低估，并列出全部偏离理论值的轴段。
+
+### 转速异常定位的判定要点
+
+- 理论速比与区间换算全部使用 **BigInt 精确分数**（转数、误差支持十进制小数），
+  无浮点误差；倍率区间端点同时以分数与小数返回。
+- 只要某级可行区间仍**包含正常倍率 1**，就不判定该级异常（保留不确定性）；
+  因此误差较大、区间较宽时结论倾向“传动正常”，这是保守且正确的行为。
+- **单次观测只记录首末轴**时，任何一级都能解释整体倍率偏差，系统只给
+  `ambiguous`；用含中间轴的观测（哪怕只补一个中间轴）即可逐级排除 / 确认。
+- “恒定”是跨观测约束：同一级在不同观测中要求的 m 区间交集为空时，
+  该级即被排除；所有级都被排除时给出 `inconsistent`。
 
 ## HTTP 接口
 
@@ -448,6 +507,71 @@ APP_PORT=8080 docker compose up --build
     （并列时按编号自然序），仅供参考。
 - 达标方案排序：**相对误差最小 → 各级 (主动轮编号, 从动轮编号) 编号自然序**。
 
+### `POST /api/diagnose`（转速异常定位）
+
+```json
+{
+  "stages": [
+    { "driveTeeth": 20, "drivenTeeth": 40 },
+    { "driveTeeth": 24, "drivenTeeth": 36 },
+    { "driveTeeth": 18, "drivenTeeth": 54 }
+  ],
+  "observations": [
+    {
+      "name": "观测一（全轴同测）",
+      "readings": [
+        { "axis": 1, "revolutions": 3600, "error": 5 },
+        { "axis": 2, "revolutions": 1800, "error": 4 },
+        { "axis": 3, "revolutions": 1320, "error": 3 },
+        { "axis": 4, "revolutions": 440, "error": 2 }
+      ]
+    },
+    {
+      "name": "观测二（缺第 3 轴）",
+      "readings": [
+        { "axis": 1, "revolutions": 3000, "error": 5 },
+        { "axis": 2, "revolutions": 1500, "error": 4 },
+        { "axis": 4, "revolutions": "366.67", "error": 2 }
+      ]
+    }
+  ]
+}
+```
+
+上例（第 2 级实测转速约为理论的 1.1 倍）返回 `verdict: "suspect"`、
+`suspectStage: 2`，第 2 级跨两次观测的恒定倍率区间约为
+`m ∈ [1.0960, 1.1040]`（区间整体在 1 上方，偏快），第 1、3 级分别因
+交叉核对失败 / 倍率区间无交集被排除。
+
+- `stages` 必须为 **1～3** 级；每级 `driveTeeth` / `drivenTeeth` 为
+  **1～100000 的正整数**。
+- `observations` 必须为 **1～20** 次；每次 `readings` 中：
+  - `axis` 为 **1～(级数+1)** 的轴号，**同一观测内不得重复**（重复返回 400）；
+  - 每次观测**必须同时含轴 1（输入轴）与末轴（输出轴）**，缺一返回 400；
+    中间轴可缺；
+  - `revolutions` 为该轴同一时段的**正转数**（数字或十进制字符串，
+    非正数返回 400）；`error` 为该读数的**绝对误差**（非负，可填 `0`，
+    负数返回 400）；**误差 ≥ 转数**时真实转数区间覆盖零值，返回 400。
+- 返回：
+  - `stages[]`：各级齿数与 `stageRatio`（分数 + 小数）；
+    `shaftRatios[]`：各轴相对输入轴的理论转速比；
+  - `observations[]`：每次的 `axes`、`readings[]`（转数 / 误差分数）
+    与 `segments[]`——该次观测全部已记录轴对的实测速比区间
+    `low`/`high`、`theory` 与 `normal`（区间是否覆盖理论值）；
+  - `verdict`：`normal` / `suspect` / `ambiguous` / `inconsistent` 四选一；
+    `normal` 为是否全部轴段相符的布尔值；
+  - `candidates[]`：逐级给出含该级轴段的倍率交集 `factorLow` / `factorHigh`
+    （分数 + 小数）、`intersectionNonEmpty`（交集是否非空）、
+    `containsUnity`（区间是否含正常倍率 1）、`direction`
+    （`above` / `below` / null）、`feasible`（交集非空且交叉核对通过）
+    与 `crossCheckFailed[]`（不含该级却偏离理论的轴段清单，含观测序号与轴段）；
+  - `feasibleStages[]` / `suspectStage`：可行级位列表与唯一可疑级
+    （仅 `suspect` 时非空）；
+  - `endAxesOnly`：是否每次观测都只记录了首末轴（为真且 `ambiguous` 时
+    页面明确提示不可凭首末轴指认级位）；
+  - `abnormalSegments[]`：全部偏离理论值的轴段清单；
+  - `message`：面向页面的中文结论说明。
+
 ## 计算与排序规则
 
 - 每级转速比 = 主动轮齿数 / 从动轮齿数；总速比 = 各级速比之积（全程约分分数）。
@@ -477,21 +601,41 @@ APP_PORT=8080 docker compose up --build
 - 总速比 = ∏ 主动齿 / 从动齿（BigInt 连乘后统一约分），相对误差与容差判定
   全部走整数乘法不等式；4 轴最多 3 级，穷举量很小。
 
+### 转速异常定位的区间换算与逐级判定
+
+- 理论速比由齿数精确给出：第 k 级 Tₖ = 主动齿/从动齿；轴 a → 轴 b 的理论
+  速比 T = ∏(a≤k<b) Tₖ（BigInt 累积分率，无浮点误差）；
+- 读数 N ± 绝对误差 e 表示真实转数 ∈ [N−e, N+e]（要求 N > e ≥ 0）；
+  轴 a → 轴 b 的实测速比区间为
+  **L = (N_b−e_b)/(N_a+e_a)，H = (N_b+e_b)/(N_a−e_a)**，端点全为精确分数；
+- 轴段与理论相符 ⇔ L ≤ T ≤ H（分数比较）；
+- 单级恒定倍率假设：至多一级 k 满足“实测 = m × 理论”且 m 跨观测恒定。
+  对每次观测内**全部已记录轴对**：
+  - 轴段 a→b **含**第 k 级（a ≤ k < b）时给出约束 m ∈ [L/T, H/T]，
+    跨全部观测取**交集**作为该级可行倍率区间；
+  - 轴段**不含**第 k 级时必须与理论相符，否则该级**交叉核对失败**；
+  - 交集非空且交叉核对全部通过 ⇔ 该级可行；
+- 全部轴段相符 → `normal`（含 1 的区间不指认任何级）；恰有一级可行 →
+  `suspect`（给倍率范围与偏快 / 偏慢方向）；多级可行 → `ambiguous`
+  （仅首末轴读数时各级区间完全相同，绝不强行指认）；无级可行 →
+  `inconsistent`（与单级恒定偏差假设不符）。
+
 ## 目录结构
 
 ```
 .
 ├── Dockerfile              # 多平台 Node 20 Alpine 镜像，构建时安装依赖
-├── docker-compose.yml      # 一键启动服务（六个页面同端口）
+├── docker-compose.yml      # 一键启动服务（七个页面同端口）
 ├── package.json
 ├── src
-│   ├── server.js           # Express 服务：静态页面 + /api/search + /api/batch + /api/procure + /api/dual-speed + /api/torque + /api/layout
+│   ├── server.js           # Express 服务：静态页面 + /api/search + /api/batch + /api/procure + /api/dual-speed + /api/torque + /api/layout + /api/diagnose
 │   ├── search.js           # 精确分数搜索算法（BigInt）：完整枚举与单台搜索
 │   ├── batch.js            # 批量装配：按集合留优 + 互不冲突组合的分支限界搜索
 │   ├── procure.js          # 缺齿补货：枚举可购子集，复用批量装配的候选分配与规则
 │   ├── dual.js             # 双档换速：共用固定第一级 + 按档换装第二级的完整枚举与择优
 │   ├── torque.js           # 带载安全：速比配对组 × 全部级次顺序的无损传动扭矩校核
-│   └── layout.js           # 轴位装配：按轴距/模数穷举有向配对并跨级组合，精确分数校核总速比
+│   ├── layout.js           # 轴位装配：按轴距/模数穷举有向配对并跨级组合，精确分数校核总速比
+│   └── diagnose.js         # 转速异常定位：读数误差区间→实测速比区间，逐级求跨观测恒定倍率区间并交叉核对
 └── public
     ├── index.html          # 单台选配页面
     ├── batch.html          # 批量装配页面（/batch）
@@ -499,11 +643,13 @@ APP_PORT=8080 docker compose up --build
     ├── dual-speed.html     # 双档换速页面（/dual-speed）
     ├── torque.html         # 带载安全选配页面（/torque）
     ├── layout.html         # 轴位装配页面（/layout）
+    ├── diagnose.html       # 转速异常定位页面（/diagnose）
     ├── styles.css
     ├── app.js              # 单台页脚本
     ├── batch.js            # 批量页脚本
     ├── procure.js          # 补货页脚本
     ├── dual-speed.js       # 双档换速页脚本
     ├── torque.js           # 带载安全页脚本
-    └── layout.js           # 轴位装配页脚本
+    ├── layout.js           # 轴位装配页脚本
+    └── diagnose.js         # 转速异常定位页脚本
 ```

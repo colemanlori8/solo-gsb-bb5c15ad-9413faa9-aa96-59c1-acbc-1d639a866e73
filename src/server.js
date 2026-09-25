@@ -28,6 +28,7 @@ const {
   MAX_AXES,
   MAX_MODULE,
 } = require('./layout');
+const { validateDiagnoseInput, diagnose, MAX_OBSERVATIONS } = require('./diagnose');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -58,6 +59,11 @@ app.get('/torque', (_req, res) => {
 /** 友好访问轴位装配页：/layout → /layout.html */
 app.get('/layout', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'layout.html'));
+});
+
+/** 友好访问转速异常定位页：/diagnose → /diagnose.html */
+app.get('/diagnose', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'diagnose.html'));
 });
 
 /** BigInt 分数安全转为有限小数（用于前端展示） */
@@ -645,6 +651,65 @@ app.post('/api/layout', (req, res) => {
   });
 });
 
+app.post('/api/diagnose', (req, res) => {
+  const body = req.body || {};
+
+  const checked = validateDiagnoseInput(body);
+  if (!checked.ok) return res.status(400).json({ error: checked.error });
+  const { stages, observations } = checked;
+
+  // 按齿数精确计算理论速比；读数误差区间转为实测速比区间；逐级求恒定倍率可行区间
+  const result = diagnose(stages, observations);
+
+  res.json({
+    stageCount: result.stageCount,
+    axisCount: result.axisCount,
+    observationCount: result.observationCount,
+    maxObservations: MAX_OBSERVATIONS,
+    stages: result.stages.map((st) => ({
+      stage: st.stage,
+      driveTeeth: st.driveTeeth,
+      drivenTeeth: st.drivenTeeth,
+      stageRatio: serializeFrac(result.stageRatios[st.stage - 1]),
+    })),
+    shaftRatios: result.shaftRatios.map(serializeFrac),
+    observations: result.observations.map((ob, oi) => ({
+      name: ob.name || `观测 ${oi + 1}`,
+      axes: ob.axes,
+      readings: ob.readings.map((rd) => ({
+        axis: rd.axis,
+        revolutions: serializeFrac(rd.revolutions),
+        error: serializeFrac(rd.error),
+      })),
+      segments: ob.segments.map((s) => ({
+        fromAxis: s.fromAxis,
+        toAxis: s.toAxis,
+        low: serializeFrac(s.low),
+        high: serializeFrac(s.high),
+        theory: serializeFrac(s.theory),
+        normal: s.normal,
+      })),
+    })),
+    verdict: result.verdict,
+    normal: result.normal,
+    endAxesOnly: result.endAxesOnly,
+    abnormalSegments: result.abnormalSegments,
+    candidates: result.candidates.map((c) => ({
+      stage: c.stage,
+      feasible: c.feasible,
+      intersectionNonEmpty: c.intersectionNonEmpty,
+      factorLow: serializeFrac(c.factorLow),
+      factorHigh: serializeFrac(c.factorHigh),
+      containsUnity: c.containsUnity,
+      direction: c.direction,
+      crossCheckFailed: c.crossCheckFailed,
+    })),
+    feasibleStages: result.feasibleStages,
+    suspectStage: result.suspectStage,
+    message: result.message,
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`齿轮组选配服务已启动： http://localhost:${PORT}`);
   console.log(`  单台选配： http://localhost:${PORT}/`);
@@ -653,4 +718,5 @@ app.listen(PORT, () => {
   console.log(`  双档换速： http://localhost:${PORT}/dual-speed`);
   console.log(`  带载安全： http://localhost:${PORT}/torque`);
   console.log(`  轴位装配： http://localhost:${PORT}/layout`);
+  console.log(`  转速异常定位： http://localhost:${PORT}/diagnose`);
 });

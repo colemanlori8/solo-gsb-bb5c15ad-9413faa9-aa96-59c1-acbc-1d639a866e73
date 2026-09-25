@@ -365,6 +365,7 @@ module.exports = {
   cmpIdxs,
   naturalCmp,
   makeFrac,
+  parseDecimal,
   parseTarget,
   parseTolerance,
   validateGears,

@@ -340,3 +340,80 @@ table.shaft-table th, table.shaft-table td { text-align: left; vertical-align: m
 
 .solution.best-warn { border-color: #e5c07b; background: var(--warn-bg); }
 .badge.badge-warn { background: var(--warn); }
+
+/* ---------------- 转速异常定位 ---------------- */
+
+.stage-grid-head,
+.stage-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 44px;
+  gap: 10px;
+  align-items: center;
+}
+.stage-grid-head {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.stage-row { margin-bottom: 8px; }
+.stage-index { font-size: 13px; font-weight: 600; color: var(--brand-dark); white-space: nowrap; }
+@media (max-width: 640px) {
+  .stage-grid-head,
+  .stage-row { grid-template-columns: 1fr 1fr; }
+}
+
+.obs-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  background: #fafbfc;
+}
+.obs-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.obs-head .obs-name-input { flex: 1 1 200px; }
+.obs-axis-hint { font-size: 12px; }
+
+.reading-grid-head,
+.reading-row {
+  display: grid;
+  grid-template-columns: 0.8fr 1.4fr 1.4fr 44px;
+  gap: 10px;
+  align-items: center;
+}
+.reading-grid-head {
+  margin: 6px 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.reading-row { margin-bottom: 8px; }
+@media (max-width: 640px) {
+  .reading-grid-head,
+  .reading-row { grid-template-columns: 1fr 1fr; }
+}
+
+.obs-result {
+  border-top: 1px dashed var(--line);
+  margin-top: 16px;
+  padding-top: 4px;
+}
+
+.diag-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.diag-tag-suspect { background: var(--warn); color: #fff; }
+.diag-tag-amb { background: #f0ddaa; color: var(--warn); }
+.diag-tag-out { background: #eceff3; color: var(--muted); }
+.diag-ok { color: var(--brand-dark); font-weight: 600; }
+.diag-bad { color: var(--danger); font-weight: 600; }
+table.diag-cand-table td { vertical-align: middle; }
