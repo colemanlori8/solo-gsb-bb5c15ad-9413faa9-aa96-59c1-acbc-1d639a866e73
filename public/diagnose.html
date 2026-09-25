@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>转速异常定位 · 齿轮组选配</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="top-nav">
+      <a href="/">单台选配</a>
+      <a href="/batch">批量装配</a>
+      <a href="/procure">缺齿补货</a>
+      <a href="/dual-speed">双档换速</a>
+      <a href="/torque">带载安全</a>
+      <a href="/layout">轴位装配</a>
+      <a href="/diagnose" class="active">转速异常定位</a>
+    </nav>
+    <h1>🔍 转速异常定位</h1>
+    <p class="subtitle">录入 1～3 级已装主动/从动齿数与各轴同时段转数（含每个读数的绝对误差）· 误差换算实测速比区间 · 假设至多一级存在跨观测恒定倍率偏差 · 逐级求可行倍率区间并交叉核对</p>
+  </header>
+
+  <main>
+    <form id="diagnose-form" class="card">
+      <section>
+        <div class="section-head">
+          <h2>1. 已装齿轮齿数（1～3 级，按输入轴 → 输出轴顺序）</h2>
+          <div class="btn-row">
+            <button type="button" id="btn-example" class="btn ghost">填入示例</button>
+            <button type="button" id="btn-stage-add" class="btn ghost">＋ 添加级</button>
+          </div>
+        </div>
+        <div class="stage-grid-head">
+          <span>级（轴间）</span><span>主动轮齿数</span><span>从动轮齿数</span><span></span>
+        </div>
+        <div id="stage-rows"></div>
+        <p class="muted">
+          第 1 级装在轴 1（输入轴）与轴 2 之间，依次类推；n 级传动共 n+1 根轴，末轴为输出轴。
+          每级理论速比 = 主动轮齿数 / 从动轮齿数，按齿数精确计算。
+        </p>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>2. 观测记录（1～10 次；每次至少含输入轴与输出轴）</h2>
+          <div class="btn-row">
+            <button type="button" id="btn-obs-add" class="btn ghost">＋ 添加观测</button>
+          </div>
+        </div>
+        <div id="obs-list"></div>
+        <p class="muted">
+          同一观测内各轴读数须来自同一时段；转数为该轴在此时段内的转动圈数（正数，可用小数），
+          绝对误差 ≥ 0 且必须小于转数（读数区间不得覆盖 0）。中间轴可缺测；轴号选项随级数联动。
+        </p>
+      </section>
+
+      <div class="actions">
+        <button type="submit" class="btn primary">开始诊断</button>
+      </div>
+
+      <p id="form-error" class="alert error" hidden></p>
+    </form>
+
+    <section id="result-panel" class="card" hidden>
+      <div class="section-head">
+        <h2>3. 诊断结果</h2>
+        <span id="result-summary" class="summary"></span>
+      </div>
+      <p id="verdict-banner" class="alert" hidden></p>
+      <div id="theory-panel"></div>
+      <div id="obs-panels"></div>
+      <div id="candidate-panel"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>理论速比按齿数精确分数（BigInt）计算 · 读数误差换算实测速比区间 · 假设至多一级存在跨观测恒定倍率偏差 · 区间含正常倍率 1 时保留不确定性 · 不凭单次首末轴读数指认具体级位</span>
+  </footer>
+
+  <script src="diagnose.js"></script>
+</body>
+</html>

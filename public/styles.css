@@ -89,13 +89,14 @@ h2 { font-size: 16px; margin: 0 0 12px; }
 .field > span { font-size: 14px; font-weight: 600; }
 .field small { color: var(--muted); font-size: 12px; }
 
-input[type="text"], input[type="number"], input:not([type]) {
+input[type="text"], input[type="number"], input:not([type]), select {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
   font-size: 15px;
   font-family: inherit;
+  background: #fff;
 }
 input:focus { outline: 2px solid var(--brand); outline-offset: 0; border-color: var(--brand); }
 
@@ -340,3 +341,59 @@ table.shaft-table th, table.shaft-table td { text-align: left; vertical-align: m
 
 .solution.best-warn { border-color: #e5c07b; background: var(--warn-bg); }
 .badge.badge-warn { background: var(--warn); }
+
+/* ---------------- 转速异常定位 ---------------- */
+
+.stage-grid-head,
+.stage-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 44px;
+  gap: 10px;
+  align-items: center;
+}
+.stage-grid-head {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.stage-row { margin-bottom: 8px; }
+.stage-index { font-size: 13px; font-weight: 600; color: var(--brand-dark); white-space: nowrap; }
+
+.obs-block {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  background: #fafbfc;
+}
+.obs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.obs-title { font-weight: 700; font-size: 14px; }
+
+.reading-grid-head,
+.reading-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr 44px;
+  gap: 10px;
+  align-items: center;
+}
+.reading-grid-head {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.reading-row { margin-bottom: 8px; }
+@media (max-width: 640px) {
+  .stage-grid-head, .stage-row,
+  .reading-grid-head, .reading-row { grid-template-columns: 1fr 1fr; }
+}
+
+.obs-result { margin-top: 16px; }
+.seg-ok { color: var(--brand-dark); font-weight: 600; }
+.candidate-hit { background: var(--accent); }
+table.candidate-table td.cross-cell { text-align: left; }

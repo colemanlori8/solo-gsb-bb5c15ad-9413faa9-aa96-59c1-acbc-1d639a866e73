@@ -28,6 +28,11 @@ const {
   MAX_AXES,
   MAX_MODULE,
 } = require('./layout');
+const {
+  diagnose,
+  validateStages: validateDiagnoseStages,
+  validateObservations: validateDiagnoseObservations,
+} = require('./diagnose');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -58,6 +63,11 @@ app.get('/torque', (_req, res) => {
 /** 友好访问轴位装配页：/layout → /layout.html */
 app.get('/layout', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'layout.html'));
+});
+
+/** 友好访问转速异常定位页：/diagnose → /diagnose.html */
+app.get('/diagnose', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'diagnose.html'));
 });
 
 /** BigInt 分数安全转为有限小数（用于前端展示） */
@@ -158,6 +168,65 @@ function serializeLayoutSolution(r) {
       mounts: s.mounts.map(serializeShaftMount),
     })),
     unusedGears: r.unusedGears,
+  };
+}
+
+/** 转速异常定位：闭区间两端的分数 + 小数 */
+function serializeInterval(iv) {
+  return iv ? { lo: serializeFrac(iv.lo), hi: serializeFrac(iv.hi) } : null;
+}
+
+/** 转速异常定位结果：理论速比、观测轴段区间、逐级假设核对全部序列化为分数 + 小数 */
+function serializeDiagnose(r, stages) {
+  return {
+    stageCount: r.stageCount,
+    axisCount: r.axisCount,
+    observationCount: r.observationCount,
+    totalSegments: r.totalSegments,
+    verdict: r.verdict,
+    message: r.message,
+    normalConsistent: r.normalConsistent,
+    suspectStages: r.suspectStages,
+    stages: stages.map((s, i) => ({
+      stage: i + 1,
+      drive: s.drive,
+      driven: s.driven,
+      ratio: serializeFrac(s.ratio),
+    })),
+    totalRatio: serializeFrac(r.totalRatio),
+    observations: r.observations.map((o) => ({
+      observation: o.observation,
+      axes: o.axes,
+      segments: o.segments.map((seg) => ({
+        from: seg.from,
+        to: seg.to,
+        theoretical: serializeFrac(seg.theoretical),
+        lo: serializeFrac(seg.lo),
+        hi: serializeFrac(seg.hi),
+        ok: seg.ok,
+      })),
+    })),
+    candidates: r.candidates.map((c) => ({
+      stage: c.stage,
+      feasible: c.feasible,
+      interval: serializeInterval(c.interval),
+      containsNormal: c.containsNormal,
+      evidence: c.evidence.map((e) => ({
+        observation: e.observation,
+        from: e.from,
+        to: e.to,
+        lo: serializeFrac(e.lo),
+        hi: serializeFrac(e.hi),
+      })),
+      crossFailures: c.crossFailures.map((f) => ({
+        observation: f.observation,
+        from: f.from,
+        to: f.to,
+        theoretical: serializeFrac(f.theoretical),
+        lo: serializeFrac(f.lo),
+        hi: serializeFrac(f.hi),
+      })),
+    })),
   };
 }
 
@@ -645,6 +714,23 @@ app.post('/api/layout', (req, res) => {
   });
 });
 
+app.post('/api/diagnose', (req, res) => {
+  const body = req.body || {};
+
+  // 已装齿轮：1～3 级，每级主动/从动轮齿数为正整数
+  const stagesChecked = validateDiagnoseStages(body.stages);
+  if (!stagesChecked.ok) return res.status(400).json({ error: stagesChecked.error });
+  const stages = stagesChecked.stages;
+
+  // 观测记录：1～10 次；每次至少含首末轴，转数为正、误差非负且不覆盖零值、轴号不重复
+  const obsChecked = validateDiagnoseObservations(body.observations, stages.length);
+  if (!obsChecked.ok) return res.status(400).json({ error: obsChecked.error });
+
+  // 按齿数精确计算各轴段理论速比，误差换算实测区间，逐级求跨观测恒定倍率区间并交叉核对
+  const result = diagnose(stages, obsChecked.observations);
+  res.json(serializeDiagnose(result, stages));
+});
+
 app.listen(PORT, () => {
   console.log(`齿轮组选配服务已启动： http://localhost:${PORT}`);
   console.log(`  单台选配： http://localhost:${PORT}/`);
@@ -653,4 +739,5 @@ app.listen(PORT, () => {
   console.log(`  双档换速： http://localhost:${PORT}/dual-speed`);
   console.log(`  带载安全： http://localhost:${PORT}/torque`);
   console.log(`  轴位装配： http://localhost:${PORT}/layout`);
+  console.log(`  转速异常定位： http://localhost:${PORT}/diagnose`);
 });
